@@ -11,6 +11,19 @@
     .order.new { border-left: 6px solid #0f0; }
     .order.inprogress { border-left: 6px solid #ff0; }
     .order.ready { border-left: 6px solid #0ff; }
+    button {
+      background: #0a84ff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      margin-top: 5px;
+    }
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -20,33 +33,44 @@
   <script>
     const sheetId = "1G59lKX9AkLMgXEd4hw1dA6udcZFHs43UNSDhY2HoX90";  // paste your Sheet ID here
     const apiKey = "AIzaSyCWk0ckoxUYn3Uyp0mejgrF7Zy_XJPgeo0"; // see notes below
+    const updateUrl = "https://script.google.com/macros/s/AKfycbwguwqBsFuD2X0MVBHefQNnLnhQUzLrN8G9OcTQcfaa9meBeODD_HayOF39RfGgb3eu/exec";
 
     async function loadOrders() {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1?alt=json&key=${apiKey}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      const values = data.values.slice(1); // skip header row
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1?alt=json&key=${apiKey}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const values = data.values.slice(1); // skip header row
 
-      const container = document.getElementById('orders');
-      container.innerHTML = '';
+        const container = document.getElementById('orders');
+        container.innerHTML = '';
 
-      values.reverse().forEach(row => {
-        const [timestamp, name, phone, time, details, total] = row;
-        const div = document.createElement('div');
-        div.className = 'order new';
-        div.innerHTML = `
-          <strong>${name}</strong> (${phone})<br>
-          <em>${time}</em><br>
-          ${details}<br>
-          <b>${total}</b><br>
-          <small>${new Date(timestamp).toLocaleTimeString()}</small>
-        `;
-        container.appendChild(div);
-      });
-    }
+        // Loop through orders
+        values.forEach((row, i) => {
+          const [timestamp, name, phone, time, details, total, status] = row;
+          const div = document.createElement('div');
+          div.className = 'order';
+          div.style.borderLeft = status === 'Completed' ? '6px solid #0f0' : '6px solid #ff0';
 
-    loadOrders();
-    setInterval(loadOrders, 10000); // refresh every 10 s
-  </script>
-</body>
-</html>
+          div.innerHTML = `
+            <strong>${name}</strong> (${phone})<br>
+            <em>${time}</em><br>
+            ${details}<br>
+            <b>${total}</b><br>
+            Status: <span>${status || 'New'}</span><br>
+            <button onclick="markCompleted(${i + 2})" ${status === 'Completed' ? 'disabled' : ''}>✅ Mark Completed</button>
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      async function markCompleted(row) {
+        await fetch(`${updateUrl}?row=${row}&status=Completed`);
+        await loadOrders();
+      }
+
+      loadOrders();
+      setInterval(loadOrders, 10000); // refresh every 10s
+    </script>
+    </body>
+    </html>
+
