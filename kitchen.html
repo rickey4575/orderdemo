@@ -5,12 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kitchen Dashboard</title>
   <style>
-    body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }
-    h1 { text-align: center; }
-    .order { background: #222; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
-    .order.new { border-left: 6px solid #0f0; }
-    .order.inprogress { border-left: 6px solid #ff0; }
-    .order.ready { border-left: 6px solid #0ff; }
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .order {
+      background: #222;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+      transition: all 0.3s ease;
+    }
+    .order.new {
+      border-left: 6px solid #f1c40f; /* yellow */
+    }
+    .order.completed {
+      border-left: 6px solid #2ecc71; /* green */
+      opacity: 0.8;
+    }
     button {
       background: #0a84ff;
       color: white;
@@ -19,6 +37,10 @@
       padding: 6px 12px;
       cursor: pointer;
       margin-top: 5px;
+      transition: background 0.3s ease;
+    }
+    button:hover:not(:disabled) {
+      background: #0066cc;
     }
     button:disabled {
       background: #444;
@@ -31,46 +53,65 @@
   <div id="orders"></div>
 
   <script>
-    const sheetId = "1G59lKX9AkLMgXEd4hw1dA6udcZFHs43UNSDhY2HoX90";  // paste your Sheet ID here
-    const apiKey = "AIzaSyCWk0ckoxUYn3Uyp0mejgrF7Zy_XJPgeo0"; // see notes below
-    const updateUrl = "https://script.google.com/macros/s/AKfycbwguwqBsFuD2X0MVBHefQNnLnhQUzLrN8G9OcTQcfaa9meBeODD_HayOF39RfGgb3eu/exec";
+    const sheetId = "1G59lKX9AkLMgXEd4hw1dA6udcZFHs43UNSDhY2HoX90";  // your Google Sheet ID
+    const apiKey = "AIzaSyCWk0ckoxUYn3Uyp0mejgrF7Zy_XJPgeo0";         // your API key
+    const updateUrl = "https://script.google.com/macros/s/AKfycbzxg8wqGYSL8DHnHVny_1HkO2iHEkQbh35DXGmqzpX1A3N2Yc_Lje0I1vVp3EY9LbSz_g/exec"; // your Apps Script URL
 
     async function loadOrders() {
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1?alt=json&key=${apiKey}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const values = data.values.slice(1); // skip header row
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1?alt=json&key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const values = data.values.slice(1); // skip header row
 
-        const container = document.getElementById('orders');
-        container.innerHTML = '';
+      const container = document.getElementById('orders');
+      container.innerHTML = '';
 
-        // Loop through orders
-        values.forEach((row, i) => {
-          const [timestamp, name, phone, time, details, total, status] = row;
-          const div = document.createElement('div');
-          div.className = 'order';
-          div.style.borderLeft = status === 'Completed' ? '6px solid #0f0' : '6px solid #ff0';
+      values.forEach((row, i) => {
+        const [timestamp, name, phone, time, details, total, status] = row;
 
-          div.innerHTML = `
-            <strong>${name}</strong> (${phone})<br>
-            <em>${time}</em><br>
-            ${details}<br>
-            <b>${total}</b><br>
-            Status: <span>${status || 'New'}</span><br>
-            <button onclick="markCompleted(${i + 2})" ${status === 'Completed' ? 'disabled' : ''}>✅ Mark Completed</button>
-          `;
-          container.appendChild(div);
-        });
-      }
+        const div = document.createElement('div');
+        div.className = `order ${status === 'Completed' ? 'completed' : 'new'}`;
 
-      async function markCompleted(row) {
-        await fetch(`${updateUrl}?row=${row}&status=Completed`);
+        div.innerHTML = `
+          <strong>${name}</strong> (${phone})<br>
+          <em>${time}</em><br>
+          ${details || ''}<br>
+          <b>${total}</b><br>
+          Status: <span>${status || 'New'}</span><br>
+          <button onclick="markCompleted(${i + 2}, event)" ${status === 'Completed' ? 'disabled' : ''}>
+            ✅ Mark Completed
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    async function markCompleted(row, event) {
+      const button = event.target;
+      button.disabled = true;
+      button.textContent = "✅ Completed...";
+      button.style.background = "#444";
+
+      // Send update to Apps Script
+      const res = await fetch(`${updateUrl}?row=${row}&status=Completed`);
+
+      if (res.ok) {
+        button.textContent = "✅ Done";
+        button.style.background = "#2ecc71";
+        button.style.cursor = "not-allowed";
+        await new Promise(r => setTimeout(r, 800)); // slight pause for feedback
         await loadOrders();
+      } else {
+        alert("Failed to update status!");
+        button.disabled = false;
+        button.textContent = "✅ Mark Completed";
       }
+    }
 
-      loadOrders();
-      setInterval(loadOrders, 10000); // refresh every 10s
-    </script>
-    </body>
-    </html>
+    loadOrders();
+    setInterval(loadOrders, 10000); // auto-refresh every 10 seconds
+  </script>
+</body>
+</html>
+
 
